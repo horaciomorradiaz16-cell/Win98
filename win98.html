@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Windows 98 Web</title>
+<style>
+  body {
+    margin: 0;
+    background: #008080;
+    font-family: "MS Sans Serif", sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    user-select: none;
+  }
+
+  #desktop {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 90px);
+    grid-auto-rows: 100px;
+    justify-content: start;
+    align-content: start;
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .icon {
+    width: 80px;
+    text-align: center;
+    color: white;
+    font-size: 12px;
+  }
+
+  .icon img {
+    width: 48px;
+    height: 48px;
+  }
+
+  .icon span {
+    display: block;
+    text-shadow: 1px 1px #000;
+    text-transform: capitalize;
+  }
+
+  .window {
+    position: absolute;
+    top: 100px;
+    left: 100px;
+    width: 300px;
+    height: 200px;
+    background: #C0C0C0;
+    border: 2px solid #000;
+    display: none;
+    flex-direction: column;
+    box-shadow: 2px 2px 8px rgba(0,0,0,0.5);
+  }
+
+  .titlebar {
+    background: #000080;
+    color: white;
+    padding: 4px;
+    font-size: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: move;
+  }
+
+  .content {
+    flex: 1;
+    background: white;
+    overflow: auto;
+    padding: 5px;
+    font-size: 14px;
+  }
+
+  .close-btn {
+    background: red;
+    color: white;
+    border: none;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+  }
+
+  textarea {
+    width: 100%;
+    height: 70%;
+  }
+
+  #pages-list div {
+    cursor: pointer;
+    padding: 2px 0;
+  }
+  #pages-list div:hover {
+    background: #ddd;
+  }
+</style>
+</head>
+<body>
+
+<div id="desktop">
+  <div class="icon" data-window="window_pc">
+    <img src="assets/icons/Icon_pc.png" alt="">
+    <span>Mi Pc</span>
+  </div>
+  <div class="icon" data-window="window_network">
+    <img src="assets/icons/Icon_network.png" alt="">
+    <span>Red</span>
+  </div>
+  <div class="icon" data-window="window_notepad">
+    <img src="assets/icons/Icon_notepad.png" alt="">
+    <span>Bloc De Notas</span>
+  </div>
+</div>
+
+<!-- Mi PC -->
+<div class="window" id="window_pc">
+  <div class="titlebar">Mi PC <button class="close-btn">X</button></div>
+  <div class="content">
+    <ul>
+      <li>Disco Local (C:)</li>
+      <li>Documentos</li>
+      <li>Imágenes</li>
+      <li>Descargas</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Red / Editor -->
+<div class="window" id="window_network">
+  <div class="titlebar">Red <button class="close-btn">X</button></div>
+  <div class="content">
+    <h4>Crear nueva página:</h4>
+    <input type="text" id="page-title" placeholder="Título">
+    <textarea id="page-content" placeholder="Contenido HTML"></textarea>
+    <button id="save-page">Guardar Página</button>
+    <h4>Páginas existentes:</h4>
+    <div id="pages-list"></div>
+    <iframe id="iframe-red" style="width:100%;height:150px;border:1px solid #000;"></iframe>
+  </div>
+</div>
+
+<!-- Bloc de notas -->
+<div class="window" id="window_notepad">
+  <div class="titlebar">Bloc de Notas <button class="close-btn">X</button></div>
+  <div class="content" contenteditable="true">Escribe aquí...</div>
+</div>
+
+<script>
+  // Abrir ventanas
+  document.querySelectorAll('.icon').forEach(icon => {
+    icon.addEventListener('click', () => {
+      document.getElementById(icon.dataset.window).style.display = 'flex';
+    });
+  });
+
+  // Cerrar ventanas
+  document.querySelectorAll('.close-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.target.closest('.window').style.display = 'none';
+    });
+  });
+
+  // Arrastrar ventanas
+  document.querySelectorAll('.titlebar').forEach(bar => {
+    let offsetX, offsetY, dragging=false;
+    const win = bar.parentElement;
+    bar.addEventListener('touchstart', e => {
+      dragging = true;
+      const t = e.touches[0];
+      offsetX = t.clientX - win.offsetLeft;
+      offsetY = t.clientY - win.offsetTop;
+    });
+    bar.addEventListener('touchmove', e => {
+      if (!dragging) return;
+      const t = e.touches[0];
+      win.style.left = (t.clientX - offsetX)+'px';
+      win.style.top = (t.clientY - offsetY)+'px';
+    });
+    bar.addEventListener('touchend', () => dragging=false);
+  });
+
+  // Arrastrar iconos (móvil)
+  const icons = document.querySelectorAll('.icon');
+  icons.forEach(icon => {
+    let startX,startY;
+    icon.addEventListener('touchstart', e => {
+      const t = e.touches[0];
+      startX = t.clientX - icon.offsetLeft;
+      startY = t.clientY - icon.offsetTop;
+    });
+    icon.addEventListener('touchmove', e => {
+      e.preventDefault();
+      const t = e.touches[0];
+      icon.style.position='absolute';
+      icon.style.left = Math.round((t.clientX - startX)/90)*90+'px';
+      icon.style.top = Math.round((t.clientY - startY)/100)*100+'px';
+    });
+  });
+
+  // --------------------------
+  // Mini CMS en JSON local
+  const pagesKey = 'win98-pages';
+
+  function loadPages() {
+    let pages = JSON.parse(localStorage.getItem(pagesKey)) || [];
+    const container = document.getElementById('pages-list');
+    container.innerHTML = '';
+    pages.forEach((p,i)=>{
+      const div = document.createElement('div');
+      div.innerText = p.title;
+      div.addEventListener('click',()=> {
+        document.getElementById('iframe-red').srcdoc = p.content;
+      });
+      container.appendChild(div);
+    });
+    return pages;
+  }
+
+  function savePage() {
+    let pages = loadPages();
+    const title = document.getElementById('page-title').value.trim();
+    const content = document.getElementById('page-content').value.trim();
+    if(!title || !content) return alert('Escribe título y contenido');
+    pages.push({title, content});
+    localStorage.setItem(pagesKey, JSON.stringify(pages));
+    document.getElementById('page-title').value='';
+    document.getElementById('page-content').value='';
+    loadPages();
+  }
+
+  document.getElementById('save-page').addEventListener('click', savePage);
+  loadPages();
+</script>
+</body>
+</html>
